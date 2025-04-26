@@ -38,20 +38,24 @@ fi
 # Поиск файлов
 FIND_CMD=(find "$INPUT_DIR")
 if [ -n "$MAX_DEPTH" ]; then
-    FIND_CMD+=(-maxdepth "$MAX_DEPTH")
+    FIND_CMD+=(-mindepth 1 -maxdepth "$MAX_DEPTH")
 fi
 FIND_CMD+=(-type f)
 
 # Копирование файлов
-for FILE_PATH in $("${FIND_CMD[@]}"); do
-    FILE_NAME=$(basename "$FILE_PATH")
-    DEST_FILE="$OUTPUT_DIR/$FILE_NAME"
+while IFS= read -r FILE_PATH; do
+    REL_PATH="${FILE_PATH#$INPUT_DIR/}"
+    DEST_PATH="$OUTPUT_DIR/$REL_PATH"
 
-    if [ ! -e "$DEST_FILE" ]; then
-        cp "$FILE_PATH" "$DEST_FILE"
+    mkdir -p "$(dirname "$DEST_PATH")"
+
+    # Если файла нет, копируем
+    if [ ! -e "$DEST_PATH" ]; then
+        cp "$FILE_PATH" "$DEST_PATH"
     else
-        base="${FILE_NAME%.*}"
-        ext="${FILE_NAME##*.}"
+        # Добавляем суффикс
+        base="${DEST_PATH%.*}"
+        ext="${DEST_PATH##*.}"
         if [ "$base" = "$ext" ]; then
             ext=""
         else
@@ -59,9 +63,9 @@ for FILE_PATH in $("${FIND_CMD[@]}"); do
         fi
 
         i=1
-        while [ -e "$OUTPUT_DIR/${base}${i}${ext}" ]; do
+        while [ -e "${base}${i}${ext}" ]; do
             ((i++))
         done
-        cp "$FILE_PATH" "$OUTPUT_DIR/${base}${i}${ext}"
+        cp "$FILE_PATH" "${base}${i}${ext}"
     fi
-done
+done < <("${FIND_CMD[@]}")
