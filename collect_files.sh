@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Проверка аргументов
 if [ "$#" -lt 2 ]; then
     echo "Usage: $0 <input_dir> <output_dir> [--max_depth N]"
     exit 1
@@ -32,29 +33,25 @@ if [ ! -d "$OUTPUT_DIR" ]; then
     mkdir -p "$OUTPUT_DIR"
 fi
 
-FIND_CMD=(find "$INPUT_DIR")
-if [ -n "$MAX_DEPTH" ]; then
-    FIND_CMD+=(-mindepth 1)
-fi
-FIND_CMD+=(-type f)
+FIND_CMD=(find "$INPUT_DIR" -type f)
 
 while IFS= read -r FILE_PATH; do
     REL_PATH="${FILE_PATH#$INPUT_DIR/}"
 
     if [ -n "$MAX_DEPTH" ]; then
+        # Папочная часть + имя файла
         DIR_PATH=$(dirname "$REL_PATH")
         FILE_NAME=$(basename "$REL_PATH")
 
+        # Разделить папки
         IFS='/' read -r -a DIR_PARTS <<< "$DIR_PATH"
         DIR_PARTS_LEN=${#DIR_PARTS[@]}
 
         if [ "$DIR_PARTS_LEN" -ge "$MAX_DEPTH" ]; then
-            TRIMMED_DIR=$(IFS='/'; echo "${DIR_PARTS[*]:0:MAX_DEPTH}")
-        else
-            TRIMMED_DIR="$DIR_PATH"
+            # Оставить только первые max_depth-1 уровней (каталоги) + положить туда файл
+            TRIMMED_DIR=$(IFS='/'; echo "${DIR_PARTS[*]:0:MAX_DEPTH-1}")
+            REL_PATH="$TRIMMED_DIR/$FILE_NAME"
         fi
-
-        REL_PATH="$TRIMMED_DIR/$FILE_NAME"
     fi
 
     DEST_PATH="$OUTPUT_DIR/$REL_PATH"
@@ -78,4 +75,3 @@ while IFS= read -r FILE_PATH; do
         cp "$FILE_PATH" "${base}${i}${ext}"
     fi
 done < <("${FIND_CMD[@]}")
-
