@@ -42,14 +42,19 @@ while IFS= read -r FILE_PATH; do
     REL_PATH="${FILE_PATH#$INPUT_DIR/}"
 
     if [ -n "$MAX_DEPTH" ]; then
-        # Считаем глубину файла
-        DEPTH=$(echo "$REL_PATH" | grep -o "/" | wc -l)
-        
-        if [ "$DEPTH" -ge "$MAX_DEPTH" ]; then
-            # Обрезаем путь до max_depth
-            TRIMMED_PATH=$(echo "$REL_PATH" | awk -F'/' -v maxd="$MAX_DEPTH" '{out=$1; for (i=2;i<=maxd;i++) out=out"/"$i; print out}')
-            REL_PATH="$TRIMMED_PATH"
+        DIR_PATH=$(dirname "$REL_PATH")
+        FILE_NAME=$(basename "$REL_PATH")
+
+        IFS='/' read -r -a DIR_PARTS <<< "$DIR_PATH"
+        DIR_PARTS_LEN=${#DIR_PARTS[@]}
+
+        if [ "$DIR_PARTS_LEN" -ge "$MAX_DEPTH" ]; then
+            TRIMMED_DIR=$(IFS='/'; echo "${DIR_PARTS[*]:0:MAX_DEPTH}")
+        else
+            TRIMMED_DIR="$DIR_PATH"
         fi
+
+        REL_PATH="$TRIMMED_DIR/$FILE_NAME"
     fi
 
     DEST_PATH="$OUTPUT_DIR/$REL_PATH"
@@ -73,3 +78,4 @@ while IFS= read -r FILE_PATH; do
         cp "$FILE_PATH" "${base}${i}${ext}"
     fi
 done < <("${FIND_CMD[@]}")
+
