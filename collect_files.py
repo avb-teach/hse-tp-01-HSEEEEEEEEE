@@ -1,61 +1,40 @@
 #!/usr/bin/env python3
-
 from pathlib import Path
-import shutil
-import argparse
-import sys
+import argparse, shutil, sys
 
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Collect all files into one directory.")
-    p.add_argument("input_dir", type=Path, help="Исходная директория")
-    p.add_argument("output_dir", type=Path, help="Целевая директория")
-    p.add_argument(
-        "--max_depth",
-        type=int,
-        default=None,
-        help="Максимальная глубина (1 = только input_dir)",
-    )
+def g():
+    p=argparse.ArgumentParser()
+    p.add_argument("i",type=Path)
+    p.add_argument("o",type=Path)
+    p.add_argument("-d","--max_depth",type=int,default=None)
     return p.parse_args()
 
+def h(r,m):
+    s=len(r.parts)
+    for f in r.rglob("*"):
+        if f.is_file():
+            d=len(f.parts)-s-1
+            if m is None or d<=m:
+                yield f
 
-def iter_files(root: Path, max_depth: int | None):
-    start_depth = len(root.parts)
-    for path in root.rglob("*"):
-        if path.is_file():
-            depth = len(path.parts) - start_depth
-            if max_depth is None or depth <= max_depth:
-                yield path
-
-
-def unique_name(name: str, occupied: set[str]) -> str:
-    if name not in occupied:
-        occupied.add(name)
-        return name
-    stem, suffix = Path(name).stem, Path(name).suffix
-    counter = 1
+def n(x,u):
+    if x not in u:
+        u.add(x);return x
+    a=Path(x).stem
+    b=Path(x).suffix
+    c=1
     while True:
-        new_name = f"{stem}{counter}{suffix}"
-        if new_name not in occupied:
-            occupied.add(new_name)
-            return new_name
-        counter += 1
+        y=f"{a}{c}{b}"
+        if y not in u:
+            u.add(y);return y
+        c+=1
 
+def main():
+    a=g();i,o,m=a.i,a.o,a.max_depth
+    if not i.is_dir():sys.exit(1)
+    o.mkdir(parents=True,exist_ok=True)
+    u=set()
+    for f in h(i,m):
+        shutil.copy2(f,o/n(f.name,u))
 
-def main() -> None:
-    args = parse_args()
-    src, dst = args.input_dir, args.output_dir
-
-    if not src.is_dir():
-        sys.exit(f"ERROR: {src} not found or not a directory")
-    dst.mkdir(parents=True, exist_ok=True)
-
-    occupied: set[str] = set()
-    for file in iter_files(src, args.max_depth):
-        target = unique_name(file.name, occupied)
-        shutil.copy2(file, dst / target)
-
-    print(f"Copied {len(occupied)} files → {dst}")
-
-
-if __name__ == "__main__":
-    main()
+main()
