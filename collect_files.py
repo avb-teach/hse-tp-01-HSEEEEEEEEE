@@ -1,34 +1,29 @@
 #!/usr/bin/env python3
-from pathlib import Path
-import argparse, shutil, sys
 
-# аргументы
-p = argparse.ArgumentParser()
-p.add_argument("i", type=Path)                # input_dir
-p.add_argument("o", type=Path)                # output_dir
-p.add_argument("-d", "--max_depth", type=int, default=None)
-a = p.parse_args()
-SRC, DST, MD = a.i, a.o, a.max_depth
+import os
+import shutil
+import sys
 
-if not SRC.is_dir():
-    sys.exit(1)
-DST.mkdir(parents=True, exist_ok=True)
+if len(sys.argv) != 3:
+    sys.exit("Usage: collect_files.py <input_dir> <output_dir>")
 
-used = set()                                  # глобальный набор имён
-def uniq(n):                                  # name → уникальное name
-    if n not in used:
-        used.add(n); return n
-    s, e, c = Path(n).stem, Path(n).suffix, 1
-    while True:
-        m = f"{s}{c}{e}"
-        if m not in used:
-            used.add(m); return m
-        c += 1
+src_root = os.path.abspath(sys.argv[1])
+dst_root = os.path.abspath(sys.argv[2])
 
-for f in SRC.rglob("*"):
-    if not f.is_file():
-        continue
-    depth = len(f.relative_to(SRC).parts) - 1     # 0 — в SRC самом
-    if MD is not None and depth > MD:
-        continue
-    shutil.copy2(f, DST / uniq(f.name))
+if not os.path.isdir(src_root):
+    sys.exit(f"Input directory '{src_root}' does not exist")
+
+os.makedirs(dst_root, exist_ok=True)
+
+for root, _, files in os.walk(src_root):
+    for filename in files:
+        src_path = os.path.join(root, filename)
+        name, ext = os.path.splitext(filename)
+        dst_path = os.path.join(dst_root, filename)
+
+        counter = 1
+        while os.path.exists(dst_path):
+            dst_path = os.path.join(dst_root, f"{name}_{counter}{ext}")
+            counter += 1
+
+        shutil.copy2(src_path, dst_path)
