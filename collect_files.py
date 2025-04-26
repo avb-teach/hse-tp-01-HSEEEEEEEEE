@@ -1,49 +1,42 @@
 #!/usr/bin/env python3
-
-
-from __future__ import annotations
-import argparse
-import os
-import shutil
 from pathlib import Path
+import argparse, shutil, sys, collections
 
-parser = argparse.ArgumentParser(prog="collect_files.py")
-parser.add_argument("input_dir", type=Path)
-parser.add_argument("output_dir", type=Path)
-parser.add_argument("--max_depth", type=int, default=None)
+p = argparse.ArgumentParser()
+p.add_argument("i", type=Path)          # input_dir
+p.add_argument("o", type=Path)          # output_dir
+p.add_argument("-d", "--max_depth", type=int)
+a = p.parse_args()
+S, O, M = a.i, a.o, a.max_depth         # src, out, max_depth
 
-args = parser.parse_intermixed_args()
+if not S.is_dir():
+    sys.exit(1)
+O.mkdir(parents=True, exist_ok=True)
 
-src_root: Path = args.input_dir.resolve()
-dst_root: Path = args.output_dir.resolve()
-max_depth = args.max_depth
+used = collections.defaultdict(set)     # dir → {names}
 
-if not src_root.is_dir():
-    parser.error(f"'{src_root}' is not a directory")
+def uniq(t, n):                         # уникальное имя внутри dir t
+    s = used[t]
+    if n not in s:
+        s.add(n); return n
+    stem, suf, c = Path(n).stem, Path(n).suffix, 1
+    while True:
+        m = f"{stem}{c}{suf}"
+        if m not in s:
+            s.add(m); return m
+        c += 1
 
-dst_root.mkdir(parents=True, exist_ok=True)
-
-for cur_root, _, files in os.walk(src_root):
-    cur_root = Path(cur_root)
-    rel_root = cur_root.relative_to(src_root) 
-
-    # куда копировать файлы из этой директории?
-    if max_depth is None:
-        target_root = dst_root
+for f in S.rglob("*"):
+    if not f.is_file():
+        continue
+    rel = f.relative_to(S)
+    depth = len(rel.parts) - 1          # 0 — файл прямо в S
+    if M is not None and depth > M:
+        keep = rel.parts[:M]            # обрезаем до M каталогов
+    elif M is not None:
+        keep = rel.parts[:depth]        # оставить фактическую глубину (≤ M)
     else:
-        # оставляем первые N компонентов пути
-        parts = rel_root.parts[:max_depth] if rel_root != Path('.') else ()
-        target_root = dst_root.joinpath(*parts)
-        target_root.mkdir(parents=True, exist_ok=True)
-
-    for fname in files:
-        src_path = cur_root / fname
-        name, ext = os.path.splitext(fname)
-        dst_path = target_root / fname
-
-        counter = 1
-        while dst_path.exists():
-            dst_path = target_root / f"{name}_{counter}{ext}"
-            counter += 1
-
-        shutil.copy2(src_path, dst_path)
+        keep = ()                       # без --max_depth: всё в корень
+    T = O.joinpath(*keep)               # целевая директория
+    T.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(f, T / uniq(T, f.name))
